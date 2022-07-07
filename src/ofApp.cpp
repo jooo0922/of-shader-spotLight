@@ -67,7 +67,7 @@ void calcTangents(ofMesh& mesh) { // mesh 함수인자는 'ofMesh' 타입을 참
 }
 
 // 조명계산 최적화를 위해, 쉐이더에서 반복계산하지 않도록, c++ 에서 한번만 계산해줘도 되는 작업들을 수행하는 보조함수들
-glm::vec3 getLightColor(PointLight& l) {
+glm::vec3 getLightColor(SpotLight& l) {
     // vec3 값인 조명색상에 float 값인 조명강도를 스칼라배로 곱해줘서 조명색상의 밝기를 지정함.
     return l.color * l.intensity;
 }
@@ -89,8 +89,8 @@ void ofApp::setup(){
     
     cubeMesh.load("cube.ply"); // cubeMesh 메쉬로 사용할 모델링 파일 로드
 
-    waterShader.load("water.vert", "pointLightWater.frag"); // planeMesh 에 노말맵을 활용한 물셰이더를 적용하기 위한 셰이더 파일 로드
-    blinnPhong.load("mesh.vert", "pointLight.frag"); // shieldMesh 에 (노말맵)텍스쳐를 활용한 Blinn-phong 반사모델을 적용하기 위한 셰이더 파일 로드
+    waterShader.load("water.vert", "spotLightWater.frag"); // planeMesh 에 노말맵을 활용한 물셰이더를 적용하기 위한 셰이더 파일 로드
+    blinnPhong.load("mesh.vert", "spotLight.frag"); // shieldMesh 에 (노말맵)텍스쳐를 활용한 Blinn-phong 반사모델을 적용하기 위한 셰이더 파일 로드
     skyboxShader.load("skybox.vert", "skybox.frag"); // cubeMesh 에 큐브맵 텍스쳐를 적용한 셰이더를 적용하기 위한 셰이더 파일 로드
         
     waterNrm.load("water_nrm.png"); // planeMesh 의 조명계산에서 노말맵으로 사용할 텍스쳐 로드
@@ -118,7 +118,7 @@ void ofApp::update(){
 }
 
 // waterMesh 의 각종 변환행렬을 계산한 뒤, 유니폼 변수들을 전송해주면서 드로우콜을 호출하는 함수
-void ofApp::drawWater(PointLight& pointLight, glm::mat4& proj, glm::mat4& view) {
+void ofApp::drawWater(SpotLight& spotLight, glm::mat4& proj, glm::mat4& view) {
     using namespace glm;
     
     static float t = 0.0f; // static 을 특정 함수 내에서 사용하는 것을 '정적 지역 변수'라고 하며, 이 할당문은 drawWater() 함수 최초 호출 시 1번만 실행됨.
@@ -162,9 +162,10 @@ void ofApp::drawWater(PointLight& pointLight, glm::mat4& proj, glm::mat4& view) 
     shd.setUniform1f("time", t); // uv 스크롤링에 사용할 시간값 유니폼 변수로 전송
     
     shd.setUniform3f("ambientCol", glm::vec3(0.0, 0.0, 0.0)); // 환경광으로 사용할 앰비언트 라이트 색상값을 유니폼 변수로 전송.
-    shd.setUniform3f("lightPos", pointLight.position); // 포인트라이트 조명의 위치값을 유니폼 변수로 전송
-    shd.setUniform1f("lightRadius", pointLight.radius); // 포인트라이트 조명의 최대범위(포인트 라이트 구체 반지름)을 유니폼 변수로 전송
-    shd.setUniform3f("lightCol", getLightColor(pointLight)); // 조명색상을 조명강도와 곱해준 뒤, 유니폼 변수로 전송
+    shd.setUniform3f("lightPos", spotLight.position); // 스포트라이트 조명의 위치값을 유니폼 변수로 전송
+    shd.setUniform1f("lightCutoff", spotLight.cutoff); // 스포트라이트 조명 원뿔의 최대 각도 범위를 유니폼 변수로 전송
+    shd.setUniform3f("lightConeDir", spotLight.direction); // 스포트라이트 조명 원뿔의 정가운데 조명 방향벡터를 유니폼 변수로 전송
+    shd.setUniform3f("lightCol", getLightColor(spotLight)); // 조명색상을 조명강도와 곱해준 뒤, 유니폼 변수로 전송
     shd.setUniform3f("cameraPos", cam.pos); // 프래그먼트 셰이더에서 뷰 벡터를 계산하기 위해 카메라 좌표(카메라 월드좌표)를 프래그먼트 셰이더 유니폼 변수로 전송
     
     planeMesh.draw(); // planeMesh(waterMesh) 메쉬 드로우콜 호출하여 그려줌.
@@ -173,7 +174,7 @@ void ofApp::drawWater(PointLight& pointLight, glm::mat4& proj, glm::mat4& view) 
     // shd(waterShader) 사용 중단
 }
 
-void ofApp::drawSkybox(PointLight& pointLight, glm::mat4& proj, glm::mat4& view) {
+void ofApp::drawSkybox(SpotLight& spotLight, glm::mat4& proj, glm::mat4& view) {
     using namespace glm; // 이제부터 이 함수블록 내에서 glm 라이브러리에서 꺼내 쓸 함수 및 객체들은 'glm::' 을 생략해서 사용해도 됨.
     
     // cubeMesh 의 모델행렬 계산 (이동행렬만 적용)
@@ -199,7 +200,7 @@ void ofApp::drawSkybox(PointLight& pointLight, glm::mat4& proj, glm::mat4& view)
     glDepthFunc(GL_LESS); // 스카이박스를 다 그린 뒤 깊이비교모드를 원래대로 원상복구함. (깊이비교모드 관련 필기 하단 참고) Less 의 줄임말. 즉, > (보다 작음. 미만)을 의미
 }
 
-void ofApp::drawShield(PointLight& pointLight, glm::mat4& proj, glm::mat4& view) {
+void ofApp::drawShield(SpotLight& spotLight, glm::mat4& proj, glm::mat4& view) {
     using namespace glm;
     
     mat4 model = translate(vec3(0.0, 0.75, 0.0f)); // shieldMesh 의 모델행렬 계산 (이동행렬만 적용)
@@ -221,9 +222,10 @@ void ofApp::drawShield(PointLight& pointLight, glm::mat4& proj, glm::mat4& view)
     shd.setUniformTexture("envMap", cubemap.getTexture(), 3); // 환경맵 반사를 적용하기 위해 사용할 큐브맵 텍스쳐 유니폼 변수로 전송
     
     shd.setUniform3f("ambientCol", glm::vec3(0.1, 0.1, 0.1)); // 배경색과 동일한 앰비언트 라이트 색상값을 유니폼 변수로 전송.
-    shd.setUniform3f("lightPos", pointLight.position); // 포인트라이트 조명의 위치값을 유니폼 변수로 전송
-    shd.setUniform1f("lightRadius", pointLight.radius); // 포인트라이트 조명의 최대범위(포인트 라이트 구체 반지름)을 유니폼 변수로 전송
-    shd.setUniform3f("lightCol", getLightColor(pointLight)); // 조명색상을 조명강도와 곱해준 뒤, 유니폼 변수로 전송
+    shd.setUniform3f("lightPos", spotLight.position); // 스포트라이트 조명의 위치값을 유니폼 변수로 전송
+    shd.setUniform1f("lightCutoff", spotLight.cutoff); // 스포트라이트 조명 원뿔의 최대 각도 범위를 유니폼 변수로 전송
+    shd.setUniform3f("lightConeDir", spotLight.direction); // 스포트라이트 조명 원뿔의 정가운데 조명 방향벡터를 유니폼 변수로 전송
+    shd.setUniform3f("lightCol", getLightColor(spotLight)); // 조명색상을 조명강도와 곱해준 뒤, 유니폼 변수로 전송
     shd.setUniform3f("cameraPos", cam.pos); // 프래그먼트 셰이더에서 뷰 벡터를 계산하기 위해 카메라 좌표(카메라 월드좌표)를 프래그먼트 셰이더 유니폼 변수로 전송
     
     shieldMesh.draw(); // shieldMesh 메쉬 드로우콜 호출하여 그려줌.
@@ -240,12 +242,14 @@ void ofApp::draw(){
     static float t = 0.0f; // static 을 특정 함수 내에서 사용하는 것을 '정적 지역 변수'라고 하며, 이 할당문은 drawWater() 함수 최초 호출 시 1번만 실행됨.
     t += ofGetLastFrameTime(); // 이전 프레임과 현재 프레임의 시간 간격인 '델타타임'을 리턴받는 함수를 호출해서 sin함수의 인자로 사용할 시간값 t에 매 프레임마다 더해줌.
     
-    // 조명구조체 pointLight 에 조명데이터를 할당해 줌.
-    PointLight pointLight; // 조명데이터 구조체인 PointLight 타입의 객체 변수 pointLight 선언
-    pointLight.color = vec3(1, 1, 1); // 조명색상은 흰색으로 지정
-    pointLight.radius = 1.0f; // 포인트라이트 조명의 최대범위(조명 반경, 반지름.)을 1로 지정.
-    pointLight.position = vec3(sin(t), 0.5, 0.25); // sin 함수로 포인트라이트 조명위치 x좌표를 매 프레임마다 -1 ~ 1 사이로 왕복해서 전달하도록 지정.
-    pointLight.intensity = 1.0f; // 조명강도도 1로 지정. 참고로, 1보다 큰값으로 조명강도를 조명색상에 곱해줘봤자, 프래그먼트 셰이더는 (1, 1, 1, 1) 이상의 색상값을 처리할 수 없음.
+    // 조명구조체 spotLight 에 조명데이터를 할당해 줌.
+    SpotLight spotLight; // 조명데이터 구조체인 SpotLight 타입의 객체 변수 spotLight 선언
+    spotLight.color = vec3(1, 1, 1); // 조명색상은 흰색으로 지정
+//    spotLight.position = cam.pos; // 스포트라이트 조명의 위치를 카메라 위치와 동일한 곳으로 지정해서, 원뿔 영역 안에 비춰지는 조명과 그렇지 못한 영역을 더 잘 보일 수 있도록 한 것.
+    spotLight.position = cam.pos + vec3(sin(t), 0, 0); // x축으로 스포트라이트 위치를 왕복운동 시키도록 계산한 것.
+    spotLight.intensity = 1.0f; // 조명강도도 1로 지정. 참고로, 1보다 큰값으로 조명강도를 조명색상에 곱해줘봤자, 프래그먼트 셰이더는 (1, 1, 1, 1) 이상의 색상값을 처리할 수 없음.
+    spotLight.direction = vec3(0, 0, -1); // 스포트라이트 조명의 ConeDirection. 즉, 원뿔의 정 가운데 방향벡터를 z축 모니터 안쪽방향으로 지정함.
+    spotLight.cutoff = glm::cos(glm::radians(15.0f)); // 15도의 cos값을 스포트라이트 조명 원뿔의 최대 각도 범위로 지정함.
     
     // 투영행렬 계산
     float aspect = 1024.0f / 768.0f; // main.cpp 에서 정의한 윈도우 실행창 사이즈를 기준으로 원근투영행렬의 종횡비(aspect)값을 계산함.
@@ -255,9 +259,9 @@ void ofApp::draw(){
     mat4 view = inverse(translate(cam.pos)); // 뷰행렬은 카메라 움직임에 반대방향으로 나머지 대상들을 움직이는 변환행렬이므로, glm::inverse() 내장함수로 역행렬을 구해야 함.
     
     // 이후의 연산은 shield 메쉬 드로우 함수와 water 메쉬 드로우 함수로 쪼개서 추출함.
-    drawShield(pointLight, proj, view);
-    drawWater(pointLight, proj, view);
-    drawSkybox(pointLight, proj, view); // cubeMesh 메쉬 드로우 함수를 추출하여 정의한 뒤 호출함.
+    drawShield(spotLight, proj, view);
+    drawWater(spotLight, proj, view);
+    drawSkybox(spotLight, proj, view); // cubeMesh 메쉬 드로우 함수를 추출하여 정의한 뒤 호출함.
 }
 
 //--------------------------------------------------------------

@@ -9,11 +9,12 @@ struct CameraData {
     float fov;
 };
 
-struct PointLight {
+struct SpotLight {
     glm::vec3 position; // 조명의 위치 (포인트 라이트는 디렉셔널 라이트와 달리, 조명 위치를 중심으로 멀어질수록 감쇄를 계산해줘야 하므로, 조명의 '방향'이 아닌 '위치'가 필요함!)
+    glm::vec3 direction; // 스포트라이트 조명의 ConeDirection. 즉, 원뿔의 정 가운데 방향벡터 (이 벡터를 기준으로 각 프래그먼트의 toLight 벡터와 이루는 각도를 비교해서 조명의 영향을 받게 할 것인지 결정함.)
     glm::vec3 color; // 조명의 색상 (셰이더에서 계산된 노말벡터와 조명벡터의 내적값(= 디퓨즈 라이팅 값)과 곱해줄거임)
     float intensity; // 조명의 강도 (c++ 에서 조명의 색상과 곱해줘서 조명색의 밝기를 결정함.)
-    float radius; // 조명의 최대범위(포인트 라이트 구체의 반지름. 프래그먼트 셰이더에서 [포인트 라이트 중심점 ~ 각 프래그먼트까지의 거리값] 을 이 반지름으로 나눠서 감쇄를 계산해 줌)
+    float cutoff; // 스포트라이트 조명 원뿔의 최대 각도 범위 (cos 값으로 전달됨. 이 cutoff 각도를 벗어나는 영역은 조명의 영향을 0으로 만들어버림.)
 };
 
 class ofApp : public ofBaseApp{
@@ -36,9 +37,9 @@ class ofApp : public ofBaseApp{
         void gotMessage(ofMessage msg);
     
         // ofApp.cpp 에서 물 메쉬와 방패 메쉬를 그리는 함수를 분할해서 쪼개줄 것이므로, 각 함수의 메서드를 미리 선언해놓음.
-        void drawWater(PointLight& pointLight, glm::mat4& proj, glm::mat4& view);
-        void drawShield(PointLight& pointLight, glm::mat4& proj, glm::mat4& view);
-        void drawSkybox(PointLight& pointLight, glm::mat4& proj, glm::mat4& view); // ofApp.cpp 에서 큐브메쉬를 그리는 함수를 따로 추출하기 위해 선언한 메서드.
+        void drawWater(SpotLight& spotLight, glm::mat4& proj, glm::mat4& view);
+        void drawShield(SpotLight& spotLight, glm::mat4& proj, glm::mat4& view);
+        void drawSkybox(SpotLight& spotLight, glm::mat4& proj, glm::mat4& view); // ofApp.cpp 에서 큐브메쉬를 그리는 함수를 따로 추출하기 위해 선언한 메서드.
 
         
         ofMesh shieldMesh; // shield.ply 모델링 파일을 로드해서 사용할 메쉬 객체 변수 선언
